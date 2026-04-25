@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>直升机横板冒险</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            background: linear-gradient(180deg, #87CEEB 0%, #E0F6FF 100%);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        #gameCanvas {
+            display: block;
+            border-radius: 10px;
+        }
+
+        #uiOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            z-index: 10;
+        }
+
+        #uiOverlay.active {
+            display: flex;
+        }
+
+        #startScreen, #gameOverScreen, #rescueScreen {
+            text-align: center;
+            color: white;
+            display: none;
+        }
+
+        #startScreen.active, #gameOverScreen.active, #rescueScreen.active {
+            display: block;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            color: #FFD700;
+        }
+
+        h2 {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: #FF6B6B;
+        }
+
+        p {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .instruction {
+            font-size: 1rem;
+            color: #ccc;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            border: none;
+            color: white;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(255, 107, 107, 0.6);
+        }
+
+        #rescueNumber {
+            font-size: 6rem;
+            font-weight: bold;
+            color: #FFD700;
+            margin: 20px 0;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        #rescueInput {
+            width: 80px;
+            height: 80px;
+            font-size: 3rem;
+            text-align: center;
+            border: 3px solid #FFD700;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            margin: 20px 0;
+            outline: none;
+        }
+
+        #rescueInput:focus {
+            border-color: #FF6B6B;
+            box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+        }
+
+        #rescueMessage {
+            font-size: 1.1rem;
+            margin-top: 10px;
+            min-height: 24px;
+        }
+
+        #scoreDisplay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 5;
+        }
+
+        #finalScore {
+            font-size: 2rem;
+            color: #FFD700;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        <div id="scoreDisplay">得分: <span id="score">0</span></div>
+        <div id="uiOverlay">
+            <div id="startScreen" class="active">
+                <h1>🚁 直升机横板冒险</h1>
+                <p>控制你的直升机穿越障碍物！</p>
+                <p class="instruction">
+                    🎮 按住鼠标左键提升高度<br>
+                    ⚠️ 松开鼠标左键飞机会下落<br>
+                    💥 碰撞后需要答对数学题才能继续
+                </p>
+                <button id="startBtn">开始游戏</button>
+            </div>
+            
+            <div id="gameOverScreen">
+                <h2>游戏结束</h2>
+                <div id="finalScore">最终得分: 0</div>
+                <p>真可惜！再试一次吧！</p>
+                <button id="restartBtn">重新开始</button>
+            </div>
+            
+            <div id="rescueScreen">
+                <h2>⚠️ 紧急救援</h2>
+                <p>直升机受损！输入数字救援！</p>
+                <p>输入的数字与屏幕数字相加<strong>必须进位</strong></p>
+                <p>例如：显示 5，输入 6 则 5+6=11 进位成功</p>
+                <div id="rescueNumber">0</div>
+                <input type="number" id="rescueInput" min="0" max="9" placeholder="?" autocomplete="off">
+                <div id="rescueMessage"></div>
+                <button id="rescueBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 游戏配置
+        const CONFIG = {
+            canvasWidth: 800,
+            canvasHeight: 500,
+            gravity: 0.4,
+            lift: -0.8,
+            helicopterX: 150,
+            helicopterWidth: 60,
+            helicopterHeight: 30,
+            obstacleSpeed: 4,
+            obstacleGap: 150,
+            obstacleWidth: 80,
+            obstacleMinHeight: 100,
+            obstacleMaxHeight: 300,
+            obstacleSpawnInterval: 100
+        };
+
+        // 游戏状态
+        const GameState = {
+            START: 'start',
+            PLAYING: 'playing',
+            RESCUE: 'rescue',
+            GAMEOVER: 'gameover'
+        };
+
+        // 游戏变量
+        let canvas, ctx;
+        let gameState = GameState.START;
+        let helicopter = {
+            x: CONFIG.helicopterX,
+            y: CONFIG.canvasHeight / 2,
+            width: CONFIG.helicopterWidth,
+            height: CONFIG.helicopterHeight,
+            velocity: 0,
+            rotation: 0
+        };
+        let obstacles = [];
+        let score = 0;
+        let frameCount = 0;
+        let isLifting = false;
+        let rescueNumber = 0;
+        let particles = [];
+        let clouds = [];
+        let backgroundOffset = 0;
+        let mountains = [];
+
+        // 初始化山脉数据
+        function initMountains() {
+            mountains = [];
+            for (let i = 0; i < 5; i++) {
+                mountains.push({
+                    x: i * 300,
+                    height: 100 + Math.random() * 150,
+                    width: 200 + Math.random() * 100
+                });
+            }
+        }
+
+        // 初始化云朵数据
+        function initClouds() {
+            clouds = [];
+            for (let i = 0; i < 5; i++) {
+                clouds.push({
+                    x: Math.random() * CONFIG.canvasWidth,
+                    y: Math.random() * (CONFIG.canvasHeight / 3),
+                    width: 80 + Math.random() * 60,
+                    height: 30 + Math.random() * 20,
+                    speed: 0.3 + Math.random() * 0.3
+                });
+            }
+        }
+
+        // 绘制直升机
+        function drawHelicopter() {
+            ctx.save();
+            ctx.translate(helicopter.x, helicopter.y);
+            ctx.rotate(helicopter.rotation);
+            
+            // 直升机机身
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, helicopter.width / 2, helicopter.height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 驾驶舱
+            ctx.fillStyle = '#2196F3';
+            ctx.beginPath();
+            ctx.ellipse(10, -5, 15, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 尾部
+            ctx.fillStyle = '#388E3C';
+            ctx.fillRect(-helicopter.width / 2 - 20, -5, 25, 10);
+            
+            // 尾翼
+            ctx.fillStyle = '#4CAF50';
+            ctx.beginPath();
+            ctx.moveTo(-helicopter.width / 2 - 20, -5);
+            ctx.lineTo(-helicopter.width / 2 - 20, -15);
+            ctx.lineTo(-helicopter.width / 2 - 10, -5);
+            ctx.fill();
+            
+            // 主旋翼
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-helicopter.width / 2 + 10, -helicopter.height / 2);
+            ctx.lineTo(helicopter.width / 2 - 10, -helicopter.height / 2);
+            ctx.stroke();
+            
+            // 旋翼动画效果
+            const rotorAngle = (frameCount * 0.3) % (Math.PI * 2);
+            ctx.save();
+            ctx.translate(0, -helicopter.height / 2);
+            ctx.rotate(rotorAngle);
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+            ctx.fillRect(-40, -2, 80, 4);
+            ctx.restore();
+            
+            // 尾旋翼
+            const tailRotorAngle = (frameCount * 0.5) % (Math.PI * 2);
+            ctx.save();
+            ctx.translate(-helicopter.width / 2 - 15, 0);
+            ctx.rotate(tailRotorAngle);
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
+            ctx.fillRect(-10, -1, 20, 2);
+            ctx.restore();
+            
+            ctx.restore();
+        }
+
+        // 绘制障碍物
+        function drawObstacle(obstacle) {
+            // 上方障碍物
+            ctx.fillStyle = obstacle.isColliding ? '#FF5722' : '#8BC34A';
+            ctx.fillRect(obstacle.x, 0, obstacle.width, obstacle.topHeight);
+            
+            // 上方障碍物底部边缘
+            ctx.fillStyle = obstacle.isColliding ? '#E64A19' : '#689F38';
+            ctx.fillRect(obstacle.x, obstacle.topHeight - 20, obstacle.width, 20);
+            
+            // 下方障碍物
+            const bottomY = obstacle.topHeight + CONFIG.obstacleGap;
+            ctx.fillStyle = obstacle.isColliding ? '#FF5722' : '#8BC34A';
+            ctx.fillRect(obstacle.x, bottomY, obstacle.width, CONFIG.canvasHeight - bottomY);
+            
+            // 下方障碍物顶部边缘
+            ctx.fillStyle = obstacle.isColliding ? '#E64A19' : '#689F38';
+            ctx.fillRect(obstacle.x, bottomY, obstacle.width, 20);
+            
+            // 障碍物装饰
+            ctx.fillStyle = obstacle.isColliding ? '#FF7043' : '#9CCC65';
+            for (let i = 0; i < 3; i++) {
+                const stripeY = i * 40;
+                if (stripeY < obstacle.topHeight - 20) {
+                    ctx.fillRect(obstacle.x + 10, stripeY + 10, obstacle.width - 20, 5);
+                }
+                if (stripeY + bottomY + 10 < CONFIG.canvasHeight - 10) {
+                    ctx.fillRect(obstacle.x + 10, bottomY + stripeY + 10, obstacle.width - 20, 5);
+                }
+            }
+        }
+
+        // 绘制背景（山脉）
+        function drawMountains() {
+            mountains.forEach(mountain => {
+                const x = mountain.x - backgroundOffset * 0.3;
+                ctx.fillStyle = '#6B8E23';
+                ctx.beginPath();
+                ctx.moveTo(x, CONFIG.canvasHeight);
+                ctx.lineTo(x + mountain.width / 2, CONFIG.canvasHeight - mountain.height);
+                ctx.lineTo(x + mountain.width, CONFIG.canvasHeight);
+                ctx.closePath();
+                ctx.fill();
+                
+                // 山脉轮廓
+                ctx.strokeStyle = '#556B2F';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+        }
+
+        // 绘制云朵
+        function drawClouds() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            clouds.forEach(cloud => {
+                const x = cloud.x - backgroundOffset * 0.5;
+                ctx.beginPath();
+                ctx.ellipse(x, cloud.y, cloud.width / 2, cloud.height / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(x + cloud.width * 0.3, cloud.y + cloud.height * 0.2, cloud.width * 0.4, cloud.height * 0.6, 0, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        // 绘制粒子效果
+        function drawParticles() {
+            particles.forEach(particle => {
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // 创建粒子效果
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    velocityX: (Math.random() - 0.5) * 8,
+                    velocityY: (Math.random() - 0.5) * 8,
+                    size: Math.random() * 5 + 2,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        // 更新粒子
+        function updateParticles() {
+            particles = particles.filter(particle => {
+                particle.x += particle.velocityX;
+                particle.y += particle.velocityY;
+                particle.life -= 0.02;
+                particle.size *= 0.98;
+                return particle.life > 0;
+            });
+        }
+
+        // 更新云朵
+        function updateClouds() {
+            clouds.forEach(cloud => {
+                cloud.x -= cloud.speed;
+                if (cloud.x + cloud.width < 0) {
+                    cloud.x = CONFIG.canvasWidth + cloud.width;
+                    cloud.y = Math.random() * (CONFIG.canvasHeight / 3);
+                }
+            });
+        }
+
+        // 更新山脉
+        function updateMountains() {
+            mountains.forEach(mountain => {
+                const x = mountain.x - backgroundOffset * 0.3;
+                if (x + mountain.width < 0) {
+                    mountain.x = CONFIG.canvasWidth + mountain.width - 100;
+                    mountain.height = 100 + Math.random() * 150;
+                }
+            });
+        }
+
+        // 碰撞检测
+        function checkCollision() {
+            // 检查边界碰撞
+            if (helicopter.y - helicopter.height / 2 < 0 || 
+                helicopter.y + helicopter.height / 2 > CONFIG.canvasHeight) {
+                return true;
+            }
+            
+            // 检查障碍物碰撞
+            for (let obstacle of obstacles) {
+                // 直升机碰撞边界（稍微缩小一点以更精确）
+                const heliLeft = helicopter.x - helicopter.width / 2 + 10;
+                const heliRight = helicopter.x + helicopter.width / 2 - 10;
+                const heliTop = helicopter.y - helicopter.height / 2 + 5;
+                const heliBottom = helicopter.y + helicopter.height / 2 - 5;
+                
+                // 上方障碍物碰撞
+                if (heliRight > obstacle.x && 
+                    heliLeft < obstacle.x + obstacle.width &&
+                    heliTop < obstacle.topHeight) {
+                    obstacle.isColliding = true;
+                    return true;
+                }
+                
+                // 下方障碍物碰撞
+                const bottomY = obstacle.topHeight + CONFIG.obstacleGap;
+                if (heliRight > obstacle.x && 
+                    heliLeft < obstacle.x + obstacle.width &&
+                    heliBottom > bottomY) {
+                    obstacle.isColliding = true;
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        // 生成障碍物
+        function spawnObstacle() {
+            const topHeight = CONFIG.obstacleMinHeight + Math.random() * (CONFIG.obstacleMaxHeight - CONFIG.obstacleMinHeight);
+            obstacles.push({
+                x: CONFIG.canvasWidth,
+                width: CONFIG.obstacleWidth,
+                topHeight: topHeight,
+                passed: false,
+                isColliding: false
+            });
+        }
+
+        // 更新游戏状态
+        function updateGame() {
+            if (gameState !== GameState.PLAYING) return;
+            
+            frameCount++;
+            backgroundOffset += CONFIG.obstacleSpeed;
+            
+            // 更新直升机物理
+            if (isLifting) {
+                helicopter.velocity += CONFIG.lift;
+            } else {
+                helicopter.velocity += CONFIG.gravity;
+            }
+            
+            // 限制速度
+            helicopter.velocity = Math.max(-8, Math.min(8, helicopter.velocity));
+            
+            // 更新位置
+            helicopter.y += helicopter.velocity;
+            
+            // 计算旋转角度（基于速度）
+            helicopter.rotation = helicopter.velocity * 0.05;
+            
+            // 生成障碍物
+            if (frameCount % CONFIG.obstacleSpawnInterval === 0) {
+                spawnObstacle();
+            }
+            
+            // 更新障碍物位置
+            obstacles.forEach(obstacle => {
+                obstacle.x -= CONFIG.obstacleSpeed;
+                obstacle.isColliding = false;
+            });
+            
+            // 移除屏幕外的障碍物并加分
+            obstacles = obstacles.filter(obstacle => {
+                if (obstacle.x + obstacle.width < helicopter.x && !obstacle.passed) {
+                    obstacle.passed = true;
+                    score++;
+                    document.getElementById('score').textContent = score;
+                }
+                return obstacle.x + obstacle.width > -50;
+            });
+            
+            // 碰撞检测
+            if (checkCollision()) {
+                createExplosion(helicopter.x, helicopter.y, '#FF6B6B');
+                enterRescueMode();
+            }
+            
+            // 更新粒子
+            updateParticles();
+            
+            // 更新云朵和山脉
+            updateClouds();
+            updateMountains();
+        }
+
+        // 渲染游戏
+        function render() {
+            // 清空画布
+            ctx.clearRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+            
+            // 绘制背景
+            const gradient = ctx.createLinearGradient(0, 0, 0, CONFIG.canvasHeight);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.7, '#E0F6FF');
+            gradient.addColorStop(1, '#B8E186');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+            
+            // 绘制山脉
+            drawMountains();
+            
+            // 绘制云朵
+            drawClouds();
+            
+            // 绘制障碍物
+            obstacles.forEach(obstacle => drawObstacle(obstacle));
+            
+            // 绘制粒子
+            drawParticles();
+            
+            // 绘制直升机
+            if (gameState === GameState.PLAYING || gameState === GameState.RESCUE) {
+                drawHelicopter();
+            }
+        }
+
+        // 游戏主循环
+        function gameLoop() {
+            updateGame();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 进入救援模式
+        function enterRescueMode() {
+            gameState = GameState.RESCUE;
+            rescueNumber = Math.floor(Math.random() * 9) + 1; // 1-9
+            document.getElementById('rescueNumber').textContent = rescueNumber;
+            document.getElementById('rescueInput').value = '';
+            document.getElementById('rescueInput').focus();
+            document.getElementById('rescueMessage').textContent = '';
+            document.getElementById('uiOverlay').classList.add('active');
+            document.getElementById('startScreen').classList.remove('active');
+            document.getElementById('gameOverScreen').classList.remove('active');
+            document.getElementById('rescueScreen').classList.add('active');
+        }
+
+        // 检查救援是否成功
+        function checkRescue() {
+            const input = parseInt(document.getElementById('rescueInput').value);
+            
+            if (isNaN(input) || input < 0 || input > 9) {
+                document.getElementById('rescueMessage').textContent = '请输入0-9之间的数字！';
+                document.getElementById('rescueMessage').style.color = '#FF6B6B';
+                return;
+            }
+            
+            const sum = rescueNumber + input;
+            const canCarry = sum >= 10;
+            
+            if (canCarry) {
+                // 救援成功
+                document.getElementById('rescueMessage').textContent = `${rescueNumber} + ${input} = ${sum}，进位成功！直升机修复！`;
+                document.getElementById('rescueMessage').style.color = '#4CAF50';
+                
+                // 清除障碍物，重置位置
+                setTimeout(() => {
+                    obstacles = [];
+                    helicopter.y = CONFIG.canvasHeight / 2;
+                    helicopter.velocity = 0;
+                    gameState = GameState.PLAYING;
+                    document.getElementById('uiOverlay').classList.remove('active');
+                    document.getElementById('rescueScreen').classList.remove('active');
+                }, 1500);
+            } else {
+                // 救援失败
+                document.getElementById('rescueMessage').textContent = `${rescueNumber} + ${input} = ${sum}，无法进位！直升机坠毁...`;
+                document.getElementById('rescueMessage').style.color = '#FF6B6B';
+                
+                setTimeout(() => {
+                    gameOver();
+                }, 1500);
+            }
+        }
+
+        // 游戏结束
+        function gameOver() {
+            gameState = GameState.GAMEOVER;
+            document.getElementById('finalScore').textContent = `最终得分: ${score}`;
+            document.getElementById('rescueScreen').classList.remove('active');
+            document.getElementById('gameOverScreen').classList.add('active');
+            document.getElementById('uiOverlay').classList.add('active');
+        }
+
+        // 开始游戏
+        function startGame() {
+            gameState = GameState.PLAYING;
+            score = 0;
+            frameCount = 0;
+            obstacles = [];
+            particles = [];
+            helicopter.y = CONFIG.canvasHeight / 2;
+            helicopter.velocity = 0;
+            helicopter.rotation = 0;
+            backgroundOffset = 0;
+            
+            document.getElementById('score').textContent = score;
+            document.getElementById('uiOverlay').classList.remove('active');
+            document.getElementById('startScreen').classList.remove('active');
+            document.getElementById('gameOverScreen').classList.remove('active');
+            document.getElementById('rescueScreen').classList.remove('active');
+        }
+
+        // 初始化游戏
+        function init() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            
+            initMountains();
+            initClouds();
+            
+            // 事件监听
+            // 鼠标事件
+            canvas.addEventListener('mousedown', () => {
+                if (gameState === GameState.PLAYING) {
+                    isLifting = true;
+                }
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isLifting = false;
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                isLifting = false;
+            });
+            
+            // 触摸事件支持
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (gameState === GameState.PLAYING) {
+                    isLifting = true;
+                }
+            });
+            
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                isLifting = false;
+            });
+            
+            // 按钮事件
+            document.getElementById('startBtn').addEventListener('click', startGame);
+            document.getElementById('restartBtn').addEventListener('click', startGame);
+            document.getElementById('rescueBtn').addEventListener('click', checkRescue);
+            
+            // 救援输入回车确认
+            document.getElementById('rescueInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    checkRescue();
+                }
+            });
+            
+            // 开始游戏循环
+            gameLoop();
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
