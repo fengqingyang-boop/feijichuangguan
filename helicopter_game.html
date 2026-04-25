@@ -222,8 +222,9 @@
         var CONFIG = {
             canvasWidth: 800,
             canvasHeight: 500,
-            gravity: 0.35,
-            lift: -0.7,
+            gravity: 0.08,
+            lift: -0.16,
+            maxVelocity: 3,
             helicopterX: 150,
             helicopterWidth: 50,
             helicopterHeight: 25,
@@ -318,7 +319,7 @@
             ctx.save();
             ctx.translate(helicopter.x, helicopter.y);
             
-            var angle = Math.max(-0.3, Math.min(0.3, helicopter.velocity * 0.03));
+            var angle = Math.max(-0.3, Math.min(0.3, helicopter.velocity * 0.08));
             ctx.rotate(angle);
             
             // 机身
@@ -485,7 +486,7 @@
             }
             
             // 限制速度
-            helicopter.velocity = Math.max(-7, Math.min(7, helicopter.velocity));
+            helicopter.velocity = Math.max(-CONFIG.maxVelocity, Math.min(CONFIG.maxVelocity, helicopter.velocity));
             
             // 更新位置
             helicopter.y += helicopter.velocity;
